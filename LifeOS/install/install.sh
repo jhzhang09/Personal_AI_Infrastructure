@@ -5,7 +5,7 @@
 #
 #   Unlike a whole-harness install, this does NOT clobber your setup.
 #   It drops the LifeOS skill into your existing harness, then hands off
-#   to the agentic `/LifeOS setup`, which (with your permission) does the
+#   to the agentic `/lifeos-setup`, which (with your permission) does the
 #   conflict detection, the principal conversation, the TELOS interview
 #   (current state + ideal state), pulls in any sources you provide, and
 #   wires hooks — adapting to YOUR OS and harness as it goes.
@@ -13,20 +13,32 @@
 #   What this script does (the bootstrap only):
 #     1. Verifies prerequisites (curl, bash, tar; offers to install bun)
 #     2. Detects your harness + any existing LifeOS install (no clobber)
-#     3. Fetches the pinned LifeOS release (or uses $LIFEOS_SRC locally)
+#     3. Fetches the latest LifeOS release (or uses $LIFEOS_SRC locally)
 #     4. Places the LifeOS skill additively into your skills dir
-#     5. Hands off to `/LifeOS setup` (the agentic onboarding)
+#     5. Hands off to `/lifeos-setup` (the agentic onboarding)
 #
 #   Local/offline install (no network):
 #     LIFEOS_SRC=/path/to/LIFEOS_RELEASES/<version> bash install.sh
 # ═══════════════════════════════════════════════════════════════════
 set -euo pipefail
 
-# ─── Pinned release ──────────────────────────────────────────────
-LIFEOS_VERSION="${LIFEOS_VERSION:-6.0.5}"
-LIFEOS_TAG="v${LIFEOS_VERSION}"
-# Repo owner/name are parameterized — set at publish time, never hard-coded here.
+# ─── Release resolution — always the latest published release ─────
+# No pin: this resolves the newest GitHub Release at run time, so every new
+# release reaches every installer with zero edits here. Override with
+# LIFEOS_VERSION=x.y.z (or LIFEOS_TAG=vx.y.z) to force a specific version.
+# Falls back to a known-good tag if the GitHub API is unreachable, so the
+# install never hard-fails on a network hiccup.
+# Repo owner/name is parameterized — set at publish time, never hard-coded here.
 LIFEOS_REPO="${LIFEOS_REPO:-danielmiessler/LifeOS}"
+LIFEOS_FALLBACK_TAG="v7.0.0"
+if [ -n "${LIFEOS_VERSION:-}" ]; then
+  LIFEOS_TAG="v${LIFEOS_VERSION}"
+elif [ -z "${LIFEOS_TAG:-}" ]; then
+  LIFEOS_TAG="$(curl -fsSL "https://api.github.com/repos/${LIFEOS_REPO}/releases/latest" 2>/dev/null \
+    | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1 || true)"
+  LIFEOS_TAG="${LIFEOS_TAG:-$LIFEOS_FALLBACK_TAG}"
+fi
+LIFEOS_VERSION="${LIFEOS_TAG#v}"
 LIFEOS_TARBALL_URL="${LIFEOS_TARBALL_URL:-https://github.com/${LIFEOS_REPO}/archive/refs/tags/${LIFEOS_TAG}.tar.gz}"
 # Where the LifeOS skill dir lives inside the release tree:
 LIFEOS_RELEASE_SUBPATH="${LIFEOS_RELEASE_SUBPATH:-LifeOS}"
@@ -157,7 +169,7 @@ success "LifeOS skill placed at ${TARGET/#$HOME/~}"
 
 # ─── Step 5: Hand off to the agentic setup ───────────────────────
 step "5/5  Onboarding"
-if [ "$DRY_RUN" = "1" ]; then info "[DRY-RUN] Would launch /LifeOS setup"; exit 0; fi
+if [ "$DRY_RUN" = "1" ]; then info "[DRY-RUN] Would launch /lifeos-setup"; exit 0; fi
 echo
 success "LifeOS is installed. Now let's set it up for YOU."
 info "The rest is a conversation — it detects conflicts, asks about your TELOS"
@@ -166,7 +178,7 @@ info "hooks with your permission. Nothing changes without you saying yes."
 echo
 if command -v claude >/dev/null 2>&1 && [ -z "${CLAUDECODE:-}" ]; then
   info "Launching setup..."
-  exec claude "/LifeOS setup"
+  exec claude "/lifeos-setup"
 else
-  printf "  ${BOLD}Open your harness and run:${RESET}  ${LIGHT_BLUE}/LifeOS setup${RESET}\n\n"
+  printf "  ${BOLD}Open your harness and run:${RESET}  ${LIGHT_BLUE}/lifeos-setup${RESET}\n\n"
 fi

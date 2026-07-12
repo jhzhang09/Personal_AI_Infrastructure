@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/danielmiessler/LifeOS/main/images/lifeos-logo.png" alt="LifeOS" width="200">
+<img src="art/release-art.png" alt="LifeOS 7.0.0 — The Bitter Pill Release" width="820">
 
 # LifeOS 7.0.0
 
